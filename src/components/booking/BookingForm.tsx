@@ -2,7 +2,7 @@
 // TAHAB HOTEL & SUITES LTD — BOOKING FORM COMPONENT
 // ==============================================================================
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useNavigate } from 'react-router-dom';
@@ -14,6 +14,7 @@ import {
   Phone,
   MessageSquare,
   ShieldCheck,
+  AlertCircle,
 } from 'lucide-react';
 import type { Room } from '../../types';
 import { bookingFormSchema, type BookingFormValues } from '../../schemas';
@@ -21,6 +22,7 @@ import { createBooking } from '../../services/bookingService';
 import { Button } from '../common/Button';
 import { useToast } from '../../contexts/ToastContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { getBookingErrorMessage, isRoomConflictError, isDateError } from '../../utils/bookingErrors';
 
 interface BookingFormProps {
   rooms: Room[];
@@ -38,6 +40,7 @@ export const BookingForm: React.FC<BookingFormProps> = ({
   const navigate = useNavigate();
   const { user } = useAuth();
   const { showToast } = useToast();
+  const [inlineError, setInlineError] = useState<{ title: string; message: string } | null>(null);
 
   const today = new Date().toISOString().split('T')[0];
   const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
@@ -98,6 +101,9 @@ export const BookingForm: React.FC<BookingFormProps> = ({
   }, [watchedCheckIn, watchedCheckOut, watchedGuests, onDatesChange]);
 
   const onSubmit = async (data: BookingFormValues) => {
+    // Clear any previous inline errors
+    setInlineError(null);
+
     try {
       const booking = await createBooking({
         roomId: data.roomId,
@@ -120,11 +126,19 @@ export const BookingForm: React.FC<BookingFormProps> = ({
         state: { booking },
       });
     } catch (err: any) {
+      const errorDisplay = getBookingErrorMessage(err);
+
+      // Show toast notification
       showToast({
         type: 'error',
-        title: 'Booking Notice',
-        message: err?.message || 'Unable to complete booking. Please verify your selected dates.',
+        title: errorDisplay.title,
+        message: errorDisplay.message,
       });
+
+      // Show inline error for room conflict or date issues
+      if (isRoomConflictError(err) || isDateError(err)) {
+        setInlineError(errorDisplay);
+      }
     }
   };
 
@@ -213,6 +227,17 @@ export const BookingForm: React.FC<BookingFormProps> = ({
           )}
         </div>
       </div>
+
+      {/* Inline Error Display for Date/Room Issues */}
+      {inlineError && (
+        <div className="bg-amber-50 border border-amber-200 rounded-sm p-4 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <h4 className="font-semibold text-amber-900 text-sm">{inlineError.title}</h4>
+            <p className="text-xs text-amber-800 mt-0.5 leading-relaxed">{inlineError.message}</p>
+          </div>
+        </div>
+      )}
 
       {/* Step 3: Guest Personal Information */}
       <div className="pt-3 sm:pt-4 border-t border-stone-200 space-y-3 sm:space-y-4">

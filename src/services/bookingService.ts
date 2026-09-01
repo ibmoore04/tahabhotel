@@ -41,6 +41,7 @@ export interface BookingFilters {
 /**
  * Create a booking atomically via the create_booking_safe RPC.
  * Price is calculated server-side — never sent from the client.
+ * Throws the original Supabase error object for proper error mapping in the UI.
  */
 export async function createBooking(input: CreateBookingInput): Promise<BookingCreationResult> {
   const sb = assertSupabaseConfigured();
@@ -56,7 +57,7 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingC
     p_special_request: input.specialRequest?.trim() || null,
   });
 
-  if (error) throw new Error(toSafeError(error));
+  if (error) throw error; // Throw original error for mapping in UI
   if (!data) throw new Error('Booking creation failed. Please try again.');
 
   return data as BookingCreationResult;
